@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnalystBot — AI Sales Intelligence</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #1e1e2e;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --green: #22c55e;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav {
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo { font-size: 1.25rem; font-weight: 700; color: var(--text); }
+    .logo span { color: var(--accent); }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; margin-left: 24px; transition: color 0.2s; }
+    nav a:hover { color: var(--text); }
+
+    /* Hero */
+    .hero {
+      padding: 100px 0 80px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -0.03em;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero p {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 40px;
+    }
+    .cta-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: white;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 1rem;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .cta-btn:hover { background: var(--accent-light); transform: translateY(-1px); }
+
+    /* How it works */
+    .how {
+      padding: 80px 0;
+    }
+    .section-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .section-title { font-size: 2rem; font-weight: 700; margin-bottom: 48px; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+    .step { padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+    .step-num { font-size: 2rem; font-weight: 800; color: var(--accent); margin-bottom: 12px; }
+    .step h3 { font-size: 1.1rem; margin-bottom: 8px; }
+    .step p { font-size: 0.9rem; color: var(--text-muted); }
+
+    /* Features */
+    .features { padding: 80px 0; }
+    .features-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .feature {
+      padding: 28px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .feature h3 { font-size: 1.1rem; margin-bottom: 8px; }
+    .feature p { font-size: 0.9rem; color: var(--text-muted); }
+    .feature-icon { font-size: 1.5rem; margin-bottom: 12px; }
+
+    /* Pricing link */
+    .pricing-cta {
+      padding: 80px 0;
+      text-align: center;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .pricing-cta p { color: var(--text-muted); margin: 20px 0; }
+
+    /* Footer */
+    footer { padding: 40px 0; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
+    @media (max-width: 700px) {
+      .steps, .features-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <div class="logo">Analyst<span>Bot</span></div>
+    <div>
+      <a href="/">Home</a>
+      <a href="/pricing">Pricing</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <h1>Your sales data,<br><span>analysed instantly.</span></h1>
+    <p>Connect your spreadsheets and get AI-powered sales summaries, trend analysis, and actionable recommendations — right from Telegram.</p>
+    <a href="/pricing" class="cta-btn">Get Started — $10/month</a>
+  </div>
+</section>
+
+<section class="how">
+  <div class="container">
+    <p class="section-label">How it works</p>
+    <h2 class="section-title">From raw data to clear insights<br>in three steps.</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Connect your data</h3>
+        <p>Upload a CSV, paste a Google Sheets link, or connect your database. Takes under a minute.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>AI analyses your sales</h3>
+        <p>AnalystBot reads your data, calculates key metrics, and spots trends you'd otherwise miss.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Ask anything</h3>
+        <p>Follow-up questions in plain English. "What dropped last quarter?" "Show me top 5 products."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="container">
+    <p class="section-label">Features</p>
+    <h2 class="section-title">Everything you need to<br>understand your sales.</h2>
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-icon">📊</div>
+        <h3>Automatic Summaries</h3>
+        <p>Get a full sales breakdown — totals, averages, trends, top products — without lifting a finger.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💬</div>
+        <h3>Conversational Q&A</h3>
+        <p>Ask follow-up questions in plain English. No pivot tables, no Excel tricks needed.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔗</div>
+        <h3>Google Sheets + CSV + Excel</h3>
+        <p>Works with whatever format your sales data is already in. No migration needed.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <h3>Instant Setup</h3>
+        <p>Connect in under a minute via Telegram. No dashboards to configure, no training required.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>Your Data Stays Private</h3>
+        <p>Data is processed and stored only for your account. Isolated per customer, always.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📈</div>
+        <h3>Actionable Recommendations</h3>
+        <p>Not just numbers — AnalystBot tells you what's dropping, what's growing, and what to do next.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pricing-cta">
+  <div class="container">
+    <h2>Ready to understand your sales?</h2>
+    <p>Plans from $10/month. Cancel anytime.</p>
+    <a href="/pricing" class="cta-btn">View Pricing</a>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>© 2026 AnalystBot · <a href="/pricing" style="color:inherit">Pricing</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

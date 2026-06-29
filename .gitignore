@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+*.json
+!config.json
+uploads/
+data/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.vercel
