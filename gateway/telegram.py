@@ -90,8 +90,9 @@ async def webhook(request: Request, token: str):
     if not expected or token != expected:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # IP check
-    _check_ip(request)
+    # IP check disabled — Telegram webhooks come from their servers, not our VPS
+    # TODO: re-enable for extra security once webhook is verified
+    # _check_ip(request)
 
     try:
         body = await request.json()
