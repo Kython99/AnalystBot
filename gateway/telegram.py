@@ -15,29 +15,57 @@ from gateway.onboarding import OnboardingFlow
 router = APIRouter()
 
 TELEGRAM_API = "https://api.telegram.org"
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-ALLOWED_IP = os.getenv("ALLOWED_IPS", "").split(",")
-ALLOWED_IP = [ip.strip() for ip in ALLOWED_IP if ip.strip()]
 
-# Verify IP whitelist
+
+def _get_token() -> str:
+    return os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+
+def _get_allowed_ips():
+    ips = os.getenv("ALLOWED_IPS", "").split(",")
+    return [ip.strip() for ip in ips if ip.strip()]
+
+
 def _check_ip(request: Request):
-    """Reject requests not from allowed IPs."""
-    if not ALLOWED_IP:
-        return  # No restriction configured
-
+    allowed = _get_allowed_ips()
+    if not allowed:
+        return
     client_ip = request.client.host if request.client else None
-    if client_ip not in ALLOWED_IP:
+    if client_ip not in allowed:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-agent_loop = AgentLoop()
-registry = TenantRegistry()
-onboarding = OnboardingFlow()
+# Lazy init — avoids loading env vars at import time on serverless
+_agent_loop = None
+_registry = None
+_onboarding = None
+
+
+def _get_agent_loop():
+    global _agent_loop
+    if _agent_loop is None:
+        _agent_loop = AgentLoop()
+    return _agent_loop
+
+
+def _get_registry():
+    global _registry
+    if _registry is None:
+        _registry = TenantRegistry()
+    return _registry
+
+
+def _get_onboarding():
+    global _onboarding
+    if _onboarding is None:
+        _onboarding = OnboardingFlow()
+    return _onboarding
 
 
 def _send_telegram(method: str, data: dict) -> dict:
-    """Make a call to the Telegram Bot API."""
-    url = f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/{method}"
+    """Make a call to the Telegram Bot API (sync)."""
+    token = _get_token()
+    url = f"{TELEGRAM_API}/bot{token}/{method}"
     with httpx.Client() as client:
         resp = client.post(url, json=data, timeout=10)
     return resp.json()
@@ -51,12 +79,17 @@ def _send_message(chat_id: int, text: str, reply_to: int = None):
     return _send_telegram("sendMessage", data)
 
 
-@router.post(f"/webhook/{TELEGRAM_BOT_TOKEN}")
-async def webhook(request: Request):
+@router.post("/webhook/{token}")
+async def webhook(request: Request, token: str):
     """
     Main Telegram webhook endpoint.
-    Receives messages, routes to onboarding or the agent.
+    Validates token in path, then routes to onboarding or agent.
     """
+    # Validate token
+    expected = _get_token()
+    if not expected or token != expected:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     # IP check
     _check_ip(request)
 
@@ -65,10 +98,10 @@ async def webhook(request: Request):
     except Exception:
         return JSONResponse({"ok": False}, status_code=400)
 
-    # Handle edited messages too
+    # Handle edited messages
     edited_message = body.get("edited_message", {})
     if edited_message:
-        return JSONResponse({"ok": True})  # We don't handle edits yet
+        return JSONResponse({"ok": True})
 
     message = body.get("message", {})
     if not message:
@@ -80,7 +113,7 @@ async def webhook(request: Request):
     if not chat_id:
         return JSONResponse({"ok": True})
 
-    # Check for document (file upload)
+    # Handle document uploads
     document = message.get("document")
     if document:
         await _handle_document(chat_id, document, message_id)
@@ -90,7 +123,7 @@ async def webhook(request: Request):
     if not text:
         return JSONResponse({"ok": True})
 
-    # Check if this is a command
+    # Route to command or message handler
     if text.startswith("/"):
         await _handle_command(chat_id, text, message_id)
     else:
@@ -104,42 +137,52 @@ async def _handle_command(chat_id: str, text: str, message_id: int):
     cmd = text.split()[0].lower()
 
     if cmd == "/start":
-        await onboarding.start(chat_id, message_id, _send_message)
+        _get_onboarding().start(chat_id, message_id, _send_message)
     elif cmd == "/help":
-        await _send_message(int(chat_id), "📊 <b>AnalystBot Commands</b>\n\n/start — Start or restart setup\n/help — Show this message\n/summary — Generate a sales report\n/myuploads — List your uploaded files\n/usage — Check your usage\n/reset — Reset conversation history", message_id)
+        _send_message(int(chat_id),
+            "📊 <b>AnalystBot Commands</b>\n\n"
+            "/start — Start or restart setup\n"
+            "/help — Show this message\n"
+            "/summary — Generate a sales report\n"
+            "/myuploads — List your uploaded files\n"
+            "/usage — Check your usage\n"
+            "/reset — Reset conversation history",
+            message_id)
     elif cmd == "/summary":
-        result = agent_loop.process(chat_id, "Generate a full sales summary and recommendations for my data.")
-        await _send_message(int(chat_id), result, message_id)
+        result = _get_agent_loop().process(chat_id,
+            "Generate a full sales summary and recommendations for my data.")
+        _send_message(int(chat_id), result, message_id)
     elif cmd == "/myuploads":
         from tools.excel import list_files
         result = list_files(chat_id)
-        await _send_message(int(chat_id), result, message_id)
+        _send_message(int(chat_id), result, message_id)
     elif cmd == "/usage":
-        usage = registry.ctx.get_usage(chat_id)
+        usage = _get_registry().ctx.get_usage(chat_id)
         used = usage.get("prompts_used", 0)
         limit = usage.get("limit", 500)
         remaining = max(0, limit - used)
-        await _send_message(int(chat_id), f"📊 <b>Usage</b>\n\nUsed: {used} / {limit}\nRemaining: {remaining}", message_id)
+        _send_message(int(chat_id),
+            f"📊 <b>Usage</b>\n\nUsed: {used} / {limit}\nRemaining: {remaining}",
+            message_id)
     elif cmd == "/reset":
-        registry.ctx.save_history(chat_id, [])
-        await _send_message(int(chat_id), "🔄 Conversation history cleared.", message_id)
+        _get_registry().ctx.save_history(chat_id, [])
+        _send_message(int(chat_id), "🔄 Conversation history cleared.", message_id)
     else:
-        await _send_message(int(chat_id), f"Unknown command: {cmd}. Type /help for available commands.", message_id)
+        _send_message(int(chat_id),
+            f"Unknown command: {cmd}. Type /help for available commands.",
+            message_id)
 
 
 async def _handle_message(chat_id: str, text: str, message_id: int):
     """Handle regular text messages."""
-    # Check if tenant is onboarded
-    config = registry.ctx.get_config(chat_id)
+    config = _get_registry().ctx.get_config(chat_id)
 
     if not config.get("data_sources"):
-        # Not onboarded — run onboarding
-        await onboarding.continue_flow(chat_id, text, message_id, _send_message)
+        _get_onboarding().continue_flow(chat_id, text, message_id, _send_message)
         return
 
-    # Run the agent
-    result = agent_loop.process(chat_id, text)
-    await _send_message(int(chat_id), result, message_id)
+    result = _get_agent_loop().process(chat_id, text)
+    _send_message(int(chat_id), result, message_id)
 
 
 async def _handle_document(chat_id: str, document: dict, message_id: int):
@@ -148,69 +191,62 @@ async def _handle_document(chat_id: str, document: dict, message_id: int):
     filename = document.get("file_name", "uploaded_file")
     mime_type = document.get("mime_type", "")
 
-    # Validate file type
-    allowed_mimes = {"text/csv": ".csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-                     "application/vnd.ms-excel": ".xls"}
+    allowed_mimes = {
+        "text/csv": ".csv",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+        "application/vnd.ms-excel": ".xls",
+    }
     ext = allowed_mimes.get(mime_type)
     if not ext:
-        await _send_message(int(chat_id),
+        _send_message(int(chat_id),
             "❌ Unsupported file type. Please upload a CSV or Excel (.xlsx/.xls) file.",
             message_id)
         return
 
-    # Ensure filename has correct extension
     if not filename.endswith(ext):
         filename += ext
 
-    # Download file from Telegram
     try:
         file_content = await _download_telegram_file(file_id)
     except Exception as e:
-        await _send_message(int(chat_id), f"❌ Failed to download file: {e}", message_id)
+        _send_message(int(chat_id), f"❌ Failed to download file: {e}", message_id)
         return
 
-    # Save to tenant uploads
     try:
-        path = registry.ctx.upload_file(chat_id, filename, file_content)
-        # Update config
-        config = registry.ctx.get_config(chat_id)
+        path = _get_registry().ctx.upload_file(chat_id, filename, file_content)
+        config = _get_registry().ctx.get_config(chat_id)
         sources = config.get("data_sources", [])
         sources.append({"type": "file", "filename": filename, "label": filename})
         config["data_sources"] = sources
-        registry.ctx.save_config(chat_id, config)
+        _get_registry().ctx.save_config(chat_id, config)
 
-        await _send_message(int(chat_id),
+        _send_message(int(chat_id),
             f"✅ File '{filename}' saved! I'll analyse it now.",
             message_id)
 
-        # Auto-analyse the file
+        # Auto-analyse
         from tools.excel import read_csv, read_excel
-        if filename.endswith(".csv"):
-            data = read_csv(chat_id, filename)
-        else:
-            data = read_excel(chat_id, filename)
-
-        result = agent_loop.process(chat_id,
+        data = read_csv(chat_id, filename) if filename.endswith(".csv") else read_excel(chat_id, filename)
+        result = _get_agent_loop().process(chat_id,
             f"Analyse this data and give me a sales summary:\n\n{data[:3000]}")
-        await _send_message(int(chat_id), result)
-
+        _send_message(int(chat_id), result)
     except Exception as e:
-        await _send_message(int(chat_id), f"❌ Error saving file: {e}", message_id)
+        _send_message(int(chat_id), f"❌ Error saving file: {e}", message_id)
 
 
 async def _download_telegram_file(file_id: str) -> bytes:
-    """Download a file from Telegram using the bot token."""
-    # Get file path
-    get_url = f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}"
-    with httpx.Client() as client:
-        resp = client.get(get_url, timeout=10)
+    """Download a file from Telegram using the bot token (async)."""
+    token = _get_token()
+    get_url = f"{TELEGRAM_API}/bot{token}/getFile?file_id={file_id}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(get_url, timeout=10)
     result = resp.json()
     if not result.get("ok"):
         raise Exception(f"Telegram API error: {result}")
 
     file_path = result["result"]["file_path"]
-    download_url = f"{TELEGRAM_API}/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
+    download_url = f"{TELEGRAM_API}/file/bot{token}/{file_path}"
 
-    with httpx.Client() as client:
-        resp = client.get(download_url, timeout=30)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(download_url, timeout=30)
     return resp.content

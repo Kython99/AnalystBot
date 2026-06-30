@@ -24,7 +24,7 @@ def _check_ip(request: Request):
 
 
 @router.post("/webhook/stripe")
-async def stripe_webhook(request: Request, stripe-signature: Optional[str] = Header(None)):
+async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Header(None, alias="stripe-signature")):
     """
     Receive and process Stripe webhook events.
 
@@ -41,7 +41,7 @@ async def stripe_webhook(request: Request, stripe-signature: Optional[str] = Hea
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
     try:
-        event = stripe.Webhook.construct_event(body, stripe-signature, STRIPE_WEBHOOK_SECRET)
+        event = stripe.Webhook.construct_event(body, stripe_signature, STRIPE_WEBHOOK_SECRET)
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 

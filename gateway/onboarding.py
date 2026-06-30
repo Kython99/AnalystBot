@@ -26,11 +26,9 @@ class OnboardingFlow:
     STATE_AWAIT_FILE = "await_file"
     STATE_COMPLETE = "complete"
 
-    def __init__(self, data_dir: str = "/root/analystbot-data"):
+    def __init__(self, data_dir: str = "/tmp/analystbot-data"):
         self.registry = TenantRegistry(data_dir)
-        # tenant_id -> current state
         self._states: dict[str, str] = {}
-        # tenant_id -> partial config
         self._partial: dict[str, dict] = {}
 
     def _get_state(self, tenant_id: str) -> str:
@@ -63,17 +61,21 @@ class OnboardingFlow:
 
         if state == self.STATE_NEW:
             self.start(chat_id, message_id, send_fn)
+            return
 
-        elif state == self.STATE_SOURCE_TYPE:
+        if state == self.STATE_SOURCE_TYPE:
             self._handle_source_type(chat_id, text, message_id, send_fn)
+            return
 
-        elif state == self.STATE_AWAIT_URL:
+        if state == self.STATE_AWAIT_URL:
             self._handle_url(chat_id, text, message_id, send_fn)
+            return
 
-        elif state == self.STATE_AWAIT_FILE:
+        if state == self.STATE_AWAIT_FILE:
             self._handle_file(chat_id, text, message_id, send_fn)
+            return
 
-        elif state == self.STATE_COMPLETE:
+        if state == self.STATE_COMPLETE:
             send_fn(
                 int(chat_id),
                 "✅ You're already set up! Just send me a question about your sales data.",
@@ -100,11 +102,7 @@ class OnboardingFlow:
             file_type = "CSV" if text == "2" else "Excel (.xlsx)"
             send_fn(
                 int(chat_id),
-                (
-                    f"📁 <b>{file_type} upload</b>\n\n"
-                    "Send me your file directly in this chat.\n"
-                    "I'll read it and start analysing right away."
-                ),
+                f"📁 <b>{file_type} upload</b>\n\nSend me your file directly in this chat.",
                 message_id,
             )
         else:
@@ -116,7 +114,7 @@ class OnboardingFlow:
 
     def _handle_url(self, chat_id: str, text: str, message_id: int, send_fn):
         """Validate and store the Google Sheets URL."""
-        if not re.search(r'docs\.google\.com/spreadsheets', text):
+        if not re.search(r"docs\.google\.com/spreadsheets", text):
             send_fn(
                 int(chat_id),
                 "❌ That doesn't look like a Google Sheets link. Please paste a full URL like:\nhttps://docs.google.com/spreadsheets/d/.../edit",
@@ -144,18 +142,20 @@ class OnboardingFlow:
             ),
             message_id,
         )
+
         # Trigger initial analysis
         from core.agent_loop import AgentLoop
         loop = AgentLoop()
-        result = loop.process(chat_id, "Analyse my connected data source and give me a summary of my sales performance.")
+        result = loop.process(
+            chat_id,
+            "Analyse my connected data source and give me a summary of my sales performance."
+        )
         send_fn(int(chat_id), result)
 
     def _handle_file(self, chat_id: str, text: str, message_id: int, send_fn):
-        """Handle file upload during onboarding (not yet implemented — user sends file)."""
+        """Handle file upload during onboarding."""
         send_fn(
             int(chat_id),
-            "📎 File upload detected! Please send the file as a document attachment in Telegram (not as text). I'll process it automatically.",
+            "📎 File upload detected! Please send the file as a document attachment in Telegram (not as text).",
             message_id,
         )
-        # Note: actual file handling is done via the Telegram document update handler
-        # which will be set up in main.py with python-telegram-bot document handling
