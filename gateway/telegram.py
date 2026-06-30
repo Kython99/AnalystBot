@@ -124,10 +124,15 @@ async def webhook(request: Request, token: str):
         return JSONResponse({"ok": True})
 
     # Route to command or message handler
-    if text.startswith("/"):
-        await _handle_command(chat_id, text, message_id)
-    else:
-        await _handle_message(chat_id, text, message_id)
+    try:
+        if text.startswith("/"):
+            await _handle_command(chat_id, text, message_id)
+        else:
+            await _handle_message(chat_id, text, message_id)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        _send_message(int(chat_id), f"⚠️ Error: {type(e).__name__}: {e}", message_id)
 
     return JSONResponse({"ok": True})
 
